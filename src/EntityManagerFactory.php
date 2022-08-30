@@ -2,9 +2,8 @@
 
 namespace LaravelDoctrine\ORM;
 
-use Doctrine\Common\Cache\Cache;
 use Doctrine\Common\EventManager;
-use Doctrine\DBAL\Connections\PrimaryReadReplicaConnection as DocrinePrimaryReadReplicaConnection;
+use Doctrine\DBAL\Connections\PrimaryReadReplicaConnection as DoctrinePrimaryReadReplicaConnection;
 use Doctrine\ORM\Cache\DefaultCacheFactory;
 use Doctrine\ORM\Configuration;
 use Doctrine\ORM\EntityManager;
@@ -24,6 +23,7 @@ use LaravelDoctrine\ORM\Configuration\MetaData\MetaData;
 use LaravelDoctrine\ORM\Configuration\MetaData\MetaDataManager;
 use LaravelDoctrine\ORM\Extensions\MappingDriverChain;
 use LaravelDoctrine\ORM\Resolvers\EntityListenerResolver;
+use Psr\Cache\CacheItemPoolInterface;
 use ReflectionException;
 
 class EntityManagerFactory
@@ -97,12 +97,9 @@ class EntityManagerFactory
      */
     public function create(array $settings = [])
     {
-        $defaultDriver = $this->config->get('doctrine.cache.default', 'array');
-
         $configuration = $this->setup->createConfiguration(
             Arr::get($settings, 'dev', false),
-            Arr::get($settings, 'proxies.path'),
-            $this->cache->driver($defaultDriver)
+            Arr::get($settings, 'proxies.path')
         );
 
         $this->setMetadataDriver($settings, $configuration);
@@ -118,7 +115,7 @@ class EntityManagerFactory
 
         if ($this->isMasterSlaveConfigured($driver)) {
             $this->hasValidMasterSlaveConfig($driver);
-            if (class_exists(DocrinePrimaryReadReplicaConnection::class)) {
+            if (class_exists(DoctrinePrimaryReadReplicaConnection::class)) {
                 $connection = (new PrimaryReadReplicaConnection($this->config, $connection))->resolve($driver);
             } else {
                 $connection = (new MasterSlaveConnection($this->config, $connection))->resolve($driver);
@@ -366,38 +363,30 @@ class EntityManagerFactory
      */
     protected function setCacheSettings(Configuration $configuration)
     {
-        $configuration->setQueryCacheImpl($this->applyNamedCacheConfiguration('query'));
-        $configuration->setResultCacheImpl($this->applyNamedCacheConfiguration('result'));
-        $configuration->setMetadataCacheImpl($this->applyNamedCacheConfiguration('metadata'));
+        $configuration->setQueryCache($this->applyNamedCacheConfiguration('query'));
+        $configuration->setMetadataCache($this->applyNamedCacheConfiguration('metadata'));
+        $configuration->setResultCache($this->applyNamedCacheConfiguration('result'));
 
         $this->setSecondLevelCaching($configuration);
     }
 
-    /**
-     * @param  string $cacheName
-     * @return Cache
-     */
-    private function applyNamedCacheConfiguration($cacheName)
+    private function applyNamedCacheConfiguration(string $cacheName): CacheItemPoolInterface
     {
         $defaultDriver    = $this->config->get('doctrine.cache.default', 'array');
         $defaultNamespace = $this->config->get('doctrine.cache.namespace');
 
         $settings = $this->config->get('doctrine.cache.' . $cacheName, []);
+        if (!isset($settings['namespace'])) {
+            $settings['namespace'] = $defaultNamespace;
+        }
         $driver   = $settings['driver'] ?? $defaultDriver;
 
         $cache = $this->cache->driver($driver, $settings);
 
-        if ($namespace = $this->config->get('doctrine.cache.' . $cacheName . '.namespace', $defaultNamespace)) {
-            $cache->setNamespace($namespace);
-        }
-
         return $cache;
     }
 
-    /**
-     * @param Configuration $configuration
-     */
-    protected function setSecondLevelCaching(Configuration $configuration)
+    protected function setSecondLevelCaching(Configuration $configuration): void
     {
         if ($this->config->get('doctrine.cache.second_level', false)) {
             $configuration->setSecondLevelCacheEnabled(true);
@@ -412,11 +401,7 @@ class EntityManagerFactory
         }
     }
 
-    /**
-     * @param array         $settings
-     * @param Configuration $configuration
-     */
-    protected function setCustomMappingDriverChain(array $settings, Configuration $configuration)
+    protected function setCustomMappingDriverChain(array $settings, Configuration $configuration): void
     {
         $chain = new MappingDriverChain(
             $configuration->getMetadataDriverImpl(),
@@ -437,13 +422,7 @@ class EntityManagerFactory
         );
     }
 
-    /**
-     * @param                        $settings
-     * @param EntityManagerInterface $manager
-     *
-     * @return mixed
-     */
-    protected function decorateManager(array $settings, EntityManagerInterface $manager)
+    protected function decorateManager(array $settings, EntityManagerInterface $manager): mixed
     {
         if ($decorator = Arr::get($settings, 'decorator', false)) {
             if (!class_exists($decorator)) {
@@ -456,12 +435,7 @@ class EntityManagerFactory
         return $manager;
     }
 
-    /**
-     * @param array $settings
-     *
-     * @return array
-     */
-    protected function getConnectionDriver(array $settings = [])
+    protected function getConnectionDriver(array $settings = []): array
     {
         $connection = Arr::get($settings, 'connection');
         $key        = 'database.connections.' . $connection;
@@ -477,7 +451,7 @@ class EntityManagerFactory
      * @param                        $settings
      * @param EntityManagerInterface $manager
      *
-     * @throws \Doctrine\DBAL\DBALException If Database Type or Doctrine Type is not found.
+     * @throws \Doctrine\DBAL\Exception If Database Type or Doctrine Type is not found.
      */
     protected function registerMappingTypes(array $settings, EntityManagerInterface $manager)
     {

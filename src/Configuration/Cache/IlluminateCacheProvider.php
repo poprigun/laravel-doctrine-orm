@@ -2,10 +2,12 @@
 
 namespace LaravelDoctrine\ORM\Configuration\Cache;
 
+use Doctrine\Common\Cache\Psr6\CacheAdapter;
 use const E_USER_DEPRECATED;
 use Illuminate\Contracts\Cache\Factory;
 use InvalidArgumentException;
 use LaravelDoctrine\ORM\Configuration\Driver;
+use Psr\Cache\CacheItemPoolInterface;
 
 class IlluminateCacheProvider implements Driver
 {
@@ -30,9 +32,9 @@ class IlluminateCacheProvider implements Driver
     /**
      * @param array $settings
      *
-     * @return IlluminateCacheAdapter
+     * @return CacheItemPoolInterface
      */
-    public function resolve(array $settings = [])
+    public function resolve(array $settings = []): CacheItemPoolInterface
     {
         $store = $this->store ?? $settings['store'] ?? null;
 
@@ -44,8 +46,13 @@ class IlluminateCacheProvider implements Driver
             trigger_error('Using driver "' . $this->store . '" with a custom store is deprecated. Please use the "illuminate" driver.', E_USER_DEPRECATED);
         }
 
-        return new IlluminateCacheAdapter(
-            $this->cache->store($store)
+        return CacheAdapter::wrap(
+            new IlluminateCacheAdapter($this->cache->store($store))
         );
+    }
+
+    public function getStore(): string
+    {
+        return $this->store;
     }
 }

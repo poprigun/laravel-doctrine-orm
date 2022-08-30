@@ -1,6 +1,5 @@
 <?php
 
-use Doctrine\Common\Cache\PhpFileCache;
 use Illuminate\Contracts\Config\Repository;
 use LaravelDoctrine\ORM\Configuration\Cache\PhpFileCacheProvider;
 use Mockery as m;
@@ -11,7 +10,11 @@ class PhpFileCacheProviderTest extends AbstractCacheProviderTest
     {
         $config = m::mock(Repository::class);
         $config->shouldReceive('get')
-            ->with('cache.stores.file.path', __DIR__ . DIRECTORY_SEPARATOR . '../../Stubs/storage/framework/cache')
+            ->with('doctrine.cache.namespace', 'doctrine-cache')
+            ->once()
+            ->andReturn('doctrine-cache');
+        $config->shouldReceive('get')
+            ->with('cache.stores.file.path', storage_path('framework/cache'))
             ->once()
             ->andReturn('/tmp');
 
@@ -22,6 +25,6 @@ class PhpFileCacheProviderTest extends AbstractCacheProviderTest
 
     public function getExpectedInstance()
     {
-        return PhpFileCache::class;
+        return \Symfony\Component\Cache\Adapter\PhpFilesAdapter::class;
     }
 }
