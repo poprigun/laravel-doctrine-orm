@@ -46,7 +46,7 @@ class ClearMetadataCacheCommand extends Command
 
             $this->message('Clearing result cache entries for <info>' . $name . '</info> entity manager');
 
-            $result  = $cache->deleteAll();
+            $result  = $cache->clear();
             $message = ($result) ? 'Successfully deleted cache entries.' : 'No cache entries were deleted.';
 
             if ($this->option('flush')) {
