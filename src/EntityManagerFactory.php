@@ -113,6 +113,10 @@ class EntityManagerFactory
             $driver
         );
 
+        if (!empty($settings['platform'])) {
+            $connection['platform'] = $settings['platform'];
+        }
+
         if ($this->isMasterSlaveConfigured($driver)) {
             $this->hasValidMasterSlaveConfig($driver);
             if (class_exists(DoctrinePrimaryReadReplicaConnection::class)) {
