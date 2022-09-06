@@ -113,8 +113,8 @@ class EntityManagerFactory
             $driver
         );
 
-        if (!empty($settings['platform'])) {
-            $connection['platform'] = $settings['platform'];
+        if (!empty($settings['platform']) && class_exists($settings['platform'])) {
+            $connection['platform'] = new $settings['platform'];
         }
 
         if ($this->isMasterSlaveConfigured($driver)) {
