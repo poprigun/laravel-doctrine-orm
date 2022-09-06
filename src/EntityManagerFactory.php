@@ -9,7 +9,7 @@ use Doctrine\ORM\Configuration;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\Tools\Setup;
+use Doctrine\ORM\ORMSetup;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Arr;
@@ -54,18 +54,12 @@ class EntityManagerFactory
     protected $container;
 
     /**
-     * @var Setup
-     */
-    private $setup;
-
-    /**
      * @var EntityListenerResolver
      */
     private $resolver;
 
     /**
      * @param Container              $container
-     * @param Setup                  $setup
      * @param MetaDataManager        $meta
      * @param ConnectionManager      $connection
      * @param CacheManager           $cache
@@ -74,7 +68,6 @@ class EntityManagerFactory
      */
     public function __construct(
         Container $container,
-        Setup $setup,
         MetaDataManager $meta,
         ConnectionManager $connection,
         CacheManager $cache,
@@ -86,7 +79,6 @@ class EntityManagerFactory
         $this->config     = $config;
         $this->cache      = $cache;
         $this->container  = $container;
-        $this->setup      = $setup;
         $this->resolver   = $resolver;
     }
 
@@ -97,9 +89,10 @@ class EntityManagerFactory
      */
     public function create(array $settings = [])
     {
-        $configuration = $this->setup->createConfiguration(
+        $configuration = ORMSetup::createConfiguration(
             Arr::get($settings, 'dev', false),
-            Arr::get($settings, 'proxies.path')
+            Arr::get($settings, 'proxies.path'),
+            $this->applyNamedCacheConfiguration(Arr::get($settings, 'cache'))
         );
 
         $this->setMetadataDriver($settings, $configuration);
